@@ -108,6 +108,9 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
     #clear-btn:hover { color: var(--vscode-foreground); }
     #search-btn { padding: 6px 12px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; }
     #search-btn:hover { background: var(--vscode-button-hoverBackground); }
+    #sort-bar { display: none; align-items: center; gap: 6px; margin-bottom: 8px; }
+    #sort-bar label { font-size: 10px; color: var(--vscode-descriptionForeground); white-space: nowrap; }
+    #sort-select { flex: 1; padding: 3px 6px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, transparent); border-radius: 4px; font-size: 11px; outline: none; cursor: pointer; }
 
     .section-title { font-size: 10px; font-weight: 700; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.8px; margin: 4px 2px 8px; }
 
@@ -157,6 +160,15 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
     </div>
   </div>
   <div id="search-view">
+    <div id="sort-bar">
+      <label>Sort by</label>
+      <select id="sort-select">
+        <option value="relevance">Relevance</option>
+        <option value="downloads">Install Count</option>
+        <option value="favers">Rating</option>
+        <option value="name">Name</option>
+      </select>
+    </div>
     <div id="status"></div>
     <div id="results"></div>
   </div>
@@ -169,6 +181,8 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
     let searchLoading = false;
     let exploreNextUrl = null;
     let exploreLoading = false;
+    let allSearchResults = [];
+    let currentSort = 'relevance';
 
     let debounceTimer = null;
 
@@ -194,12 +208,35 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
       document.getElementById('clear-btn').style.display = 'none';
       document.getElementById('explore').style.display = 'block';
       document.getElementById('search-view').style.display = 'none';
+      document.getElementById('sort-bar').style.display = 'none';
       document.getElementById('results').innerHTML = '';
+      allSearchResults = [];
+    });
+
+    document.getElementById('sort-select').addEventListener('change', () => {
+      currentSort = document.getElementById('sort-select').value;
+      renderSortedResults();
     });
 
     function showSearchView() {
       document.getElementById('explore').style.display = 'none';
       document.getElementById('search-view').style.display = 'block';
+      document.getElementById('sort-bar').style.display = 'flex';
+    }
+
+    function sortResults(results) {
+      if (currentSort === 'downloads') return [...results].sort((a, b) => b.downloads - a.downloads);
+      if (currentSort === 'favers') return [...results].sort((a, b) => b.favers - a.favers);
+      if (currentSort === 'name') return [...results].sort((a, b) => a.name.localeCompare(b.name));
+      return results; // relevance — original order
+    }
+
+    function renderSortedResults() {
+      const container = document.getElementById('results');
+      container.innerHTML = '';
+      const sorted = sortResults(allSearchResults);
+      sorted.forEach(pkg => container.appendChild(buildPackageCard(pkg)));
+      attachSearchSentinel();
     }
 
     function doSearch() {
@@ -209,6 +246,7 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
       currentPage = 1;
       totalResults = 0;
       searchLoading = false;
+      allSearchResults = [];
       showSearchView();
       document.getElementById('status').textContent = 'Searching...';
       document.getElementById('results').innerHTML = '';
@@ -407,16 +445,13 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
       } else if (msg.type === 'searchResults') {
         totalResults = msg.data.total;
         document.getElementById('status').textContent = totalResults + ' packages found';
-        const container = document.getElementById('results');
-        container.innerHTML = '';
-        msg.data.results.forEach(pkg => container.appendChild(buildPackageCard(pkg)));
+        allSearchResults = msg.data.results;
         searchLoading = false;
-        attachSearchSentinel();
+        renderSortedResults();
       } else if (msg.type === 'moreSearchResults') {
-        const container = document.getElementById('results');
-        msg.data.results.forEach(pkg => container.appendChild(buildPackageCard(pkg)));
+        allSearchResults = allSearchResults.concat(msg.data.results);
         searchLoading = false;
-        attachSearchSentinel();
+        renderSortedResults();
       } else if (msg.type === 'error') {
         document.getElementById('status').textContent = msg.message;
       }
@@ -432,12 +467,24 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
 }
 
 function renderMarkdown(md: string): string {
-  let html = esc(md);
+  // Strip HTML tags first, keep inner text
+  let text = md.replace(/<[^>]+>/g, "");
 
-  // Fenced code blocks
-  html = html.replace(/```[\w]*\n([\s\S]*?)```/g, (_, code) =>
-    `<pre><code>${code}</code></pre>`
+  // Fenced code blocks (extract before escaping)
+  const codeBlocks: string[] = [];
+  text = text.replace(/```[\w]*\n([\s\S]*?)```/g, (_, code) => {
+    codeBlocks.push(code);
+    return `\x00CODE${codeBlocks.length - 1}\x00`;
+  });
+
+  // Escape remaining text
+  let html = esc(text);
+
+  // Restore code blocks
+  html = html.replace(/\x00CODE(\d+)\x00/g, (_, i) =>
+    `<pre><code>${esc(codeBlocks[Number(i)])}</code></pre>`
   );
+
   // Inline code
   html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
   // Headings
@@ -451,8 +498,9 @@ function renderMarkdown(md: string): string {
   html = html.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
-  // Links & images
-  html = html.replace(/!\[([^\]]*)\]\([^)]+\)/g, ""); // strip images
+  // Images — strip
+  html = html.replace(/!\[([^\]]*)\]\([^)]+\)/g, "");
+  // Links
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="#">$1</a>');
   // Blockquote
   html = html.replace(/^&gt;\s*(.+)$/gm, "<blockquote>$1</blockquote>");
@@ -461,7 +509,7 @@ function renderMarkdown(md: string): string {
   html = html.replace(/(<li>[\s\S]*?<\/li>)/g, "<ul>$1</ul>");
   // Horizontal rule
   html = html.replace(/^[-*_]{3,}$/gm, "<hr>");
-  // Paragraphs: wrap double-newline-separated text blocks
+  // Paragraphs
   html = html
     .split(/\n{2,}/)
     .map((block) => {
