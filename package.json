@@ -2,7 +2,7 @@
   "name": "composer-packages",
   "displayName": "Composer Packages",
   "description": "Browse, search and install Packagist/Composer packages directly from VS Code",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "aftandilmmd",
   "icon": "media/logo.png",
   "repository": {

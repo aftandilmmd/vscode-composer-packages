@@ -5,6 +5,8 @@ Browse, search, and install [Packagist](https://packagist.org) packages directly
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue?logo=visual-studio-code)
 ![License](https://img.shields.io/github/license/aftandilmmd/vscode-composer-packages)
 
+![Screenshot](media/screenshot.png)
+
 ---
 
 ## Features
