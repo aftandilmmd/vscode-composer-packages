@@ -1,0 +1,55 @@
+{
+  "name": "composer-packages",
+  "displayName": "Composer Packages",
+  "description": "Browse, search and install Packagist/Composer packages directly from VS Code",
+  "version": "1.0.0",
+  "publisher": "aftandilmmd",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aftandilmmd/vscode-composer-packages"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "packagist-explorer",
+          "title": "Composer Packages",
+          "icon": "media/composer.png"
+        }
+      ]
+    },
+    "views": {
+      "packagist-explorer": [
+        {
+          "id": "packagistSearch",
+          "name": "Search Packages",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "packagist.installPackage",
+        "title": "Install Package",
+        "category": "Packagist"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}
