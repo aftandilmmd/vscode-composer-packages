@@ -101,8 +101,11 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
     body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); background: var(--vscode-sideBar-background); padding: 10px 8px; }
 
     #search-box { display: flex; gap: 6px; margin-bottom: 12px; }
-    #query { flex: 1; padding: 6px 10px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, transparent); border-radius: 6px; font-size: 12px; outline: none; transition: border-color 0.15s; }
+    #query-wrap { flex: 1; position: relative; display: flex; align-items: center; }
+    #query { width: 100%; padding: 6px 28px 6px 10px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, transparent); border-radius: 6px; font-size: 12px; outline: none; transition: border-color 0.15s; }
     #query:focus { border-color: var(--vscode-focusBorder); }
+    #clear-btn { position: absolute; right: 6px; background: none; border: none; cursor: pointer; color: var(--vscode-descriptionForeground); padding: 0; line-height: 1; display: none; }
+    #clear-btn:hover { color: var(--vscode-foreground); }
     #search-btn { padding: 6px 12px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; }
     #search-btn:hover { background: var(--vscode-button-hoverBackground); }
 
@@ -140,7 +143,10 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
   <div id="search-box">
-    <input id="query" type="text" placeholder="Search packages..." />
+    <div id="query-wrap">
+      <input id="query" type="text" placeholder="Search packages..." />
+      <button id="clear-btn" title="Clear">&#x2715;</button>
+    </div>
     <button id="search-btn">Search</button>
   </div>
   <div id="explore">
@@ -164,9 +170,31 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
     let exploreNextUrl = null;
     let exploreLoading = false;
 
+    let debounceTimer = null;
+
     document.getElementById('search-btn').addEventListener('click', () => doSearch());
     document.getElementById('query').addEventListener('keydown', e => {
-      if (e.key === 'Enter') doSearch();
+      if (e.key === 'Enter') { clearTimeout(debounceTimer); doSearch(); }
+    });
+    document.getElementById('query').addEventListener('input', () => {
+      const q = document.getElementById('query').value;
+      document.getElementById('clear-btn').style.display = q ? 'block' : 'none';
+      clearTimeout(debounceTimer);
+      if (!q) {
+        document.getElementById('explore').style.display = 'block';
+        document.getElementById('search-view').style.display = 'none';
+        document.getElementById('results').innerHTML = '';
+        return;
+      }
+      debounceTimer = setTimeout(() => doSearch(), 400);
+    });
+    document.getElementById('clear-btn').addEventListener('click', () => {
+      clearTimeout(debounceTimer);
+      document.getElementById('query').value = '';
+      document.getElementById('clear-btn').style.display = 'none';
+      document.getElementById('explore').style.display = 'block';
+      document.getElementById('search-view').style.display = 'none';
+      document.getElementById('results').innerHTML = '';
     });
 
     function showSearchView() {
