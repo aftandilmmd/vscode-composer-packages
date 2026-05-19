@@ -23,12 +23,6 @@ Browse, search, and install [Packagist](https://packagist.org) packages directly
 2. Search for **Composer Packages**
 3. Click **Install**
 
-### From VSIX
-
-```bash
-code --install-extension composer-packages-*.vsix
-```
-
 ## Usage
 
 1. Click the **Composer** icon in the Activity Bar
@@ -42,27 +36,6 @@ code --install-extension composer-packages-*.vsix
 
 - VS Code `1.85` or later
 - [Composer](https://getcomposer.org) installed and available in your `PATH` (required for the install feature)
-
-## Extension Settings
-
-This extension has no configurable settings.
-
-## Known Limitations
-
-- README rendering supports basic Markdown only (no HTML or images)
-- Packages hosted outside GitHub (GitLab, Bitbucket, etc.) will not show a README in the detail panel
-
-## Contributing
-
-1. Fork the repository
-2. Clone and install dependencies:
-   ```bash
-   git clone https://github.com/aftandilmmd/vscode-composer-packages
-   cd vscode-composer-packages
-   npm install
-   ```
-3. Open in VS Code and press `F5` to launch the Extension Development Host
-4. Make your changes, then open a pull request
 
 ## Author
 
