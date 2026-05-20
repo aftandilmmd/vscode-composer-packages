@@ -1,4 +1,4 @@
-# Composer Packages
+# Composer PHP Packages (Packagist)
 
 Browse, search, and install [Packagist](https://packagist.org) packages directly from the VS Code sidebar — without leaving your editor.
 
@@ -11,8 +11,10 @@ Browse, search, and install [Packagist](https://packagist.org) packages directly
 
 ## Features
 
+- **Installed packages** — See all packages from your project's `composer.json` at a glance, with `dev` badge for dev dependencies
 - **Browse popular packages** — Opens with a curated list of the most downloaded Packagist packages, with infinite scroll
 - **Search** — Find any package by name or keyword; results load incrementally as you scroll
+- **Sort results** — Sort search results by relevance, install count, rating, or name
 - **Package details** — Click any package to open a detail panel with version, download stats, and rendered README
 - **Install via Composer** — Run `composer require` for any package directly from the extension
 - **Open on Packagist** — Jump to the package's Packagist page in your browser with one click
@@ -22,17 +24,18 @@ Browse, search, and install [Packagist](https://packagist.org) packages directly
 ### From VS Code Marketplace
 
 1. Open the **Extensions** view (`Ctrl+Shift+X`)
-2. Search for **Composer Packages**
+2. Search for **Composer PHP Packages**
 3. Click **Install**
 
 ## Usage
 
 1. Click the **Composer** icon in the Activity Bar
-2. The sidebar loads popular packages automatically
-3. Use the search box to find a specific package
-4. Click a package card to view its README and details
-5. Click **+ Install** to run `composer require <package>` in your workspace terminal
-6. Click the link icon (↗) on any card to open the Packagist page in your browser
+2. The **Installed Packages** accordion shows packages from your project's `composer.json`
+3. The sidebar loads popular packages automatically below
+4. Use the search box to find a specific package
+5. Click a package card to view its README and details
+6. Click **+ Install** to run `composer require <package>` in your workspace terminal
+7. Click the link icon (↗) on any card to open the Packagist page in your browser
 
 ## Requirements
 
