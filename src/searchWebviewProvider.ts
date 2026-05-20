@@ -4,6 +4,7 @@ import { installPackage } from "./composerInstaller";
 
 export class SearchWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "packagistSearch";
+  private _detailPanel: vscode.WebviewPanel | undefined;
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -36,25 +37,33 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
           break;
         }
         case "openPackage": {
-          const panel = vscode.window.createWebviewPanel(
-            "packagistPackage",
-            message.name,
-            vscode.ViewColumn.One,
-            { enableScripts: true }
-          );
-          try {
-            const info = await getPackageInfo(message.name);
-            const readme = await getPackageReadme(info.repository);
-            panel.webview.html = getPackageDetailHtml(info, readme ?? "");
-            panel.webview.onDidReceiveMessage(async (msg) => {
+          if (!this._detailPanel) {
+            this._detailPanel = vscode.window.createWebviewPanel(
+              "packagistPackage",
+              message.name,
+              vscode.ViewColumn.One,
+              { enableScripts: true }
+            );
+            this._detailPanel.onDidDispose(() => {
+              this._detailPanel = undefined;
+            });
+            this._detailPanel.webview.onDidReceiveMessage(async (msg) => {
               if (msg.type === "install") {
                 await installPackage(msg.name);
               } else if (msg.type === "openExternal") {
                 vscode.env.openExternal(vscode.Uri.parse(msg.url));
               }
             });
+          } else {
+            this._detailPanel.title = message.name;
+            this._detailPanel.reveal(vscode.ViewColumn.One);
+          }
+          try {
+            const info = await getPackageInfo(message.name);
+            const readme = await getPackageReadme(info.repository);
+            this._detailPanel.webview.html = getPackageDetailHtml(info, readme ?? "");
           } catch {
-            panel.webview.html = `<body style="font-family:sans-serif;padding:20px">Failed to load package info.</body>`;
+            this._detailPanel.webview.html = `<body style="font-family:sans-serif;padding:20px">Failed to load package info.</body>`;
           }
           break;
         }
