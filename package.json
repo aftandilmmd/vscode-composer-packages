@@ -1,8 +1,8 @@
 {
   "name": "composer-packages",
-  "displayName": "Composer Packages",
+  "displayName": "Composer PHP Packages (Packagist)",
   "description": "Browse, search and install Packagist/Composer packages directly from VS Code",
-  "version": "1.0.4",
+  "version": "1.1.1",
   "publisher": "aftandilmmd",
   "icon": "media/logo.png",
   "repository": {

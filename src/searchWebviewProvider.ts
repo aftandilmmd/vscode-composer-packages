@@ -16,6 +16,20 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtml(webviewView.webview);
 
+    const sendInstalledPackages = async () => {
+      const installed = await readComposerJson();
+      webviewView.webview.postMessage({ type: "installedPackages", packages: installed });
+    };
+
+    sendInstalledPackages();
+
+    // Watch composer.json for changes
+    const watcher = vscode.workspace.createFileSystemWatcher("**/composer.json");
+    watcher.onDidChange(sendInstalledPackages);
+    watcher.onDidCreate(sendInstalledPackages);
+    watcher.onDidDelete(sendInstalledPackages);
+    webviewView.onDidDispose(() => watcher.dispose());
+
     // Load popular packages on open
     getPopularPackages()
       .then((result) => {
@@ -151,6 +165,20 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
 
     #explore { display: block; }
     #search-view { display: none; }
+
+    #installed-accordion { margin-bottom: 10px; }
+    #installed-accordion summary { list-style: none; display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 4px 2px; font-size: 10px; font-weight: 700; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.8px; user-select: none; }
+    #installed-accordion summary::-webkit-details-marker { display: none; }
+    #installed-accordion summary .chevron { font-size: 9px; transition: transform 0.15s; display: inline-block; }
+    #installed-accordion[open] summary .chevron { transform: rotate(90deg); }
+    #installed-list { margin-top: 4px; }
+    .installed-badge { display: inline-block; font-size: 9px; padding: 1px 5px; border-radius: 10px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); margin-left: auto; }
+    .installed-pkg { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin-bottom: 3px; background: var(--vscode-editor-background); border-radius: 7px; border: 1px solid var(--vscode-widget-border, transparent); cursor: pointer; transition: border-color 0.12s; }
+    .installed-pkg:hover { border-color: var(--vscode-focusBorder); }
+    .installed-pkg .pkg-avatar { width: 22px; height: 22px; font-size: 9px; }
+    .installed-pkg .pkg-name-wrap { flex: 1; min-width: 0; }
+    .installed-pkg .pkg-name { font-size: 11px; font-weight: 600; color: var(--vscode-textLink-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dev-badge { font-size: 9px; padding: 1px 5px; border-radius: 3px; background: var(--vscode-inputValidation-warningBackground, #6b4f00); color: var(--vscode-inputValidation-warningForeground, #e5c07b); white-space: nowrap; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -161,6 +189,11 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
     </div>
     <button id="search-btn">Search</button>
   </div>
+  <details id="installed-accordion" style="display:none">
+    <summary><span class="chevron">›</span> Installed Packages <span class="installed-badge" id="installed-count">0</span></summary>
+    <div id="installed-list"></div>
+  </details>
+
   <div id="explore">
     <div id="explore-status" class="section-title">Loading...</div>
     <div id="popular-section" style="display:none">
@@ -435,7 +468,49 @@ export class SearchWebviewProvider implements vscode.WebviewViewProvider {
 
     window.addEventListener('message', e => {
       const msg = e.data;
-      if (msg.type === 'exploreData') {
+      if (msg.type === 'installedPackages') {
+        const accordion = document.getElementById('installed-accordion');
+        const list = document.getElementById('installed-list');
+        const badge = document.getElementById('installed-count');
+        list.innerHTML = '';
+        const pkgs = msg.packages || [];
+        badge.textContent = pkgs.length;
+        if (pkgs.length === 0) { accordion.style.display = 'none'; return; }
+        accordion.style.display = 'block';
+        pkgs.forEach(p => {
+          const row = document.createElement('div');
+          row.className = 'installed-pkg';
+
+          const parts = p.name.split('/');
+          const vendor = parts[0] || '';
+          const letter = vendor.charAt(0).toUpperCase();
+          const avatar = document.createElement('div');
+          avatar.className = 'pkg-avatar';
+          avatar.textContent = letter;
+          avatar.style.background = avatarColor(vendor);
+
+          const nameWrap = document.createElement('div');
+          nameWrap.className = 'pkg-name-wrap';
+          const nameEl = document.createElement('div');
+          nameEl.className = 'pkg-name';
+          nameEl.textContent = p.name;
+          nameEl.title = p.name;
+          nameWrap.appendChild(nameEl);
+
+          row.appendChild(avatar);
+          row.appendChild(nameWrap);
+          if (p.isDev) {
+            const devBadge = document.createElement('span');
+            devBadge.className = 'dev-badge';
+            devBadge.textContent = 'dev';
+            row.appendChild(devBadge);
+          }
+          row.addEventListener('click', () => {
+            vscode.postMessage({ type: 'openPackage', name: p.name });
+          });
+          list.appendChild(row);
+        });
+      } else if (msg.type === 'exploreData') {
         document.getElementById('explore-status').style.display = 'none';
         const popularList = document.getElementById('popular-list');
         msg.packages.forEach(pkg => popularList.appendChild(buildPackageCard(pkg)));
@@ -619,4 +694,31 @@ function getNonce(): string {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
   return text;
+}
+
+async function readComposerJson(): Promise<{ name: string; isDev: boolean }[]> {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders || folders.length === 0) { return []; }
+  const composerUri = vscode.Uri.joinPath(folders[0].uri, "composer.json");
+  try {
+    const raw = await vscode.workspace.fs.readFile(composerUri);
+    const json = JSON.parse(Buffer.from(raw).toString("utf-8")) as {
+      require?: Record<string, string>;
+      "require-dev"?: Record<string, string>;
+    };
+    const packages: { name: string; isDev: boolean }[] = [];
+    for (const name of Object.keys(json.require ?? {})) {
+      if (name !== "php" && !name.startsWith("ext-")) {
+        packages.push({ name, isDev: false });
+      }
+    }
+    for (const name of Object.keys(json["require-dev"] ?? {})) {
+      if (name !== "php" && !name.startsWith("ext-")) {
+        packages.push({ name, isDev: true });
+      }
+    }
+    return packages;
+  } catch {
+    return [];
+  }
 }
